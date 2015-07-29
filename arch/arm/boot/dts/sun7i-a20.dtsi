@@ -1023,6 +1023,9 @@
 			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&ahb_gates 5>, <&ss_clk>;
 			clock-names = "ahb", "mod";
+			dmas = <&dma SUN4I_DMA_DEDICATED 11>,
+			       <&dma SUN4I_DMA_DEDICATED 10>;
+			dma-names = "rx", "tx";
 		};
 
 		spi2: spi@01c17000 {

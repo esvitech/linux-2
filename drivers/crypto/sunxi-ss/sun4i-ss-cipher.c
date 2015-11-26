@@ -51,7 +51,9 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
 		return -EINVAL;
 	}
 
+#ifndef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
 	spin_lock_irqsave(&ss->slock, flags);
+#endif
 
 	for (i = 0; i < op->keylen; i += 4)
 		writel(*(op->key + i / 4), ss->base + SS_KEY0 + i);
@@ -119,12 +121,14 @@ release_ss:
 	sg_miter_stop(&mi);
 	sg_miter_stop(&mo);
 	writel(0, ss->base + SS_CTL);
+#ifndef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
 	spin_unlock_irqrestore(&ss->slock, flags);
+#endif
 	return err;
 }
 
 /* Generic function that support SG with size not multiple of 4 */
-static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
+int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
 {
 	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(areq);
 	struct sun4i_tfm_ctx *op = crypto_ablkcipher_ctx(tfm);
@@ -185,7 +189,9 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
 	if (no_chunk == 1)
 		return sun4i_ss_opti_poll(areq);
 
+#ifndef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
 	spin_lock_irqsave(&ss->slock, flags);
+#endif
 
 	for (i = 0; i < op->keylen; i += 4)
 		writel(*(op->key + i / 4), ss->base + SS_KEY0 + i);
@@ -311,7 +317,9 @@ release_ss:
 	sg_miter_stop(&mi);
 	sg_miter_stop(&mo);
 	writel(0, ss->base + SS_CTL);
+#ifndef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
 	spin_unlock_irqrestore(&ss->slock, flags);
+#endif
 
 	return err;
 }
@@ -325,7 +333,11 @@ int sun4i_ss_cbc_aes_encrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_AES | SS_CBC | SS_ENABLED | SS_ENCRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 int sun4i_ss_cbc_aes_decrypt(struct ablkcipher_request *areq)
@@ -336,7 +348,11 @@ int sun4i_ss_cbc_aes_decrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_AES | SS_CBC | SS_ENABLED | SS_DECRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 /* ECB AES */
@@ -348,7 +364,11 @@ int sun4i_ss_ecb_aes_encrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_AES | SS_ECB | SS_ENABLED | SS_ENCRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 int sun4i_ss_ecb_aes_decrypt(struct ablkcipher_request *areq)
@@ -359,7 +379,11 @@ int sun4i_ss_ecb_aes_decrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_AES | SS_ECB | SS_ENABLED | SS_DECRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 /* CBC DES */
@@ -371,7 +395,11 @@ int sun4i_ss_cbc_des_encrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_DES | SS_CBC | SS_ENABLED | SS_ENCRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 int sun4i_ss_cbc_des_decrypt(struct ablkcipher_request *areq)
@@ -382,7 +410,11 @@ int sun4i_ss_cbc_des_decrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_DES | SS_CBC | SS_ENABLED | SS_DECRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 /* ECB DES */
@@ -394,7 +426,11 @@ int sun4i_ss_ecb_des_encrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_DES | SS_ECB | SS_ENABLED | SS_ENCRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 int sun4i_ss_ecb_des_decrypt(struct ablkcipher_request *areq)
@@ -405,7 +441,11 @@ int sun4i_ss_ecb_des_decrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_DES | SS_ECB | SS_ENABLED | SS_DECRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 /* CBC 3DES */
@@ -417,7 +457,11 @@ int sun4i_ss_cbc_des3_encrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_3DES | SS_CBC | SS_ENABLED | SS_ENCRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 int sun4i_ss_cbc_des3_decrypt(struct ablkcipher_request *areq)
@@ -428,7 +472,11 @@ int sun4i_ss_cbc_des3_decrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_3DES | SS_CBC | SS_ENABLED | SS_DECRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 /* ECB 3DES */
@@ -440,7 +488,11 @@ int sun4i_ss_ecb_des3_encrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_3DES | SS_ECB | SS_ENABLED | SS_ENCRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 int sun4i_ss_ecb_des3_decrypt(struct ablkcipher_request *areq)
@@ -451,7 +503,11 @@ int sun4i_ss_ecb_des3_decrypt(struct ablkcipher_request *areq)
 
 	rctx->mode = SS_OP_3DES | SS_ECB | SS_ENABLED | SS_DECRYPTION |
 		op->keymode;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_cipher_request_to_engine(op->ss->engine, areq);
+#else
 	return sun4i_ss_cipher_poll(areq);
+#endif
 }
 
 int sun4i_ss_cipher_init(struct crypto_tfm *tfm)

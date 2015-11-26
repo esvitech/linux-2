@@ -529,6 +529,7 @@ config CRYPTO_DEV_SUN4I_SS
 	select CRYPTO_AES
 	select CRYPTO_DES
 	select CRYPTO_BLKCIPHER
+	select CRYPTO_ENGINE
 	help
 	  Some Allwinner SoC have a crypto accelerator named
 	  Security System. Select this if you want to use it.
@@ -545,6 +546,13 @@ config CRYPTO_DEV_SUN4I_SS_PRNG
 	help
 	  This driver provides kernel-side support for the Pseudo-Random
 	  Number Generator found in the Security System.
+
+config CRYPTO_DEV_SUN4I_SS_ASYNC
+	bool "Made Allwinner Security System asynchronous"
+	depends on CRYPTO_DEV_SUN4I_SS
+	help
+	  This option made the Security System asynchronous at the cost
+	  of some performance loss.
 
 config CRYPTO_DEV_ROCKCHIP
 	tristate "Rockchip's Cryptographic Engine driver"

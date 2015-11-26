@@ -26,6 +26,12 @@
 
 #include "sun4i-ss.h"
 
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+#define SS_ASYNC_FLAG CRYPTO_ALG_ASYNC
+#else
+#define SS_ASYNC_FLAG 0
+#endif
+
 static struct sun4i_ss_alg_template ss_algs[] = {
 {       .type = CRYPTO_ALG_TYPE_AHASH,
 	.mode = SS_OP_MD5,
@@ -45,7 +51,8 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 				.cra_driver_name = "md5-sun4i-ss",
 				.cra_priority = 300,
 				.cra_alignmask = 3,
-				.cra_flags = CRYPTO_ALG_TYPE_AHASH,
+				.cra_flags = CRYPTO_ALG_TYPE_AHASH |
+					SS_ASYNC_FLAG,
 				.cra_blocksize = MD5_HMAC_BLOCK_SIZE,
 				.cra_ctxsize = sizeof(struct sun4i_req_ctx),
 				.cra_module = THIS_MODULE,
@@ -73,7 +80,8 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 				.cra_driver_name = "sha1-sun4i-ss",
 				.cra_priority = 300,
 				.cra_alignmask = 3,
-				.cra_flags = CRYPTO_ALG_TYPE_AHASH,
+				.cra_flags = CRYPTO_ALG_TYPE_AHASH |
+					SS_ASYNC_FLAG,
 				.cra_blocksize = SHA1_BLOCK_SIZE,
 				.cra_ctxsize = sizeof(struct sun4i_req_ctx),
 				.cra_module = THIS_MODULE,
@@ -89,7 +97,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 		.cra_driver_name = "cbc-aes-sun4i-ss",
 		.cra_priority = 300,
 		.cra_blocksize = AES_BLOCK_SIZE,
-		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER,
+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER | SS_ASYNC_FLAG,
 		.cra_ctxsize = sizeof(struct sun4i_tfm_ctx),
 		.cra_module = THIS_MODULE,
 		.cra_alignmask = 3,
@@ -111,7 +119,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 		.cra_driver_name = "ecb-aes-sun4i-ss",
 		.cra_priority = 300,
 		.cra_blocksize = AES_BLOCK_SIZE,
-		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER,
+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER | SS_ASYNC_FLAG,
 		.cra_ctxsize = sizeof(struct sun4i_tfm_ctx),
 		.cra_module = THIS_MODULE,
 		.cra_alignmask = 3,
@@ -133,7 +141,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 		.cra_driver_name = "cbc-des-sun4i-ss",
 		.cra_priority = 300,
 		.cra_blocksize = DES_BLOCK_SIZE,
-		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER,
+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER | SS_ASYNC_FLAG,
 		.cra_ctxsize = sizeof(struct sun4i_req_ctx),
 		.cra_module = THIS_MODULE,
 		.cra_alignmask = 3,
@@ -155,7 +163,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 		.cra_driver_name = "ecb-des-sun4i-ss",
 		.cra_priority = 300,
 		.cra_blocksize = DES_BLOCK_SIZE,
-		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER,
+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER | SS_ASYNC_FLAG,
 		.cra_ctxsize = sizeof(struct sun4i_req_ctx),
 		.cra_module = THIS_MODULE,
 		.cra_alignmask = 3,
@@ -176,7 +184,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 		.cra_driver_name = "cbc-des3-sun4i-ss",
 		.cra_priority = 300,
 		.cra_blocksize = DES3_EDE_BLOCK_SIZE,
-		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER,
+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER | SS_ASYNC_FLAG,
 		.cra_ctxsize = sizeof(struct sun4i_req_ctx),
 		.cra_module = THIS_MODULE,
 		.cra_alignmask = 3,
@@ -198,7 +206,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 		.cra_driver_name = "ecb-des3-sun4i-ss",
 		.cra_priority = 300,
 		.cra_blocksize = DES3_EDE_BLOCK_SIZE,
-		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER,
+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER | SS_ASYNC_FLAG,
 		.cra_ctxsize = sizeof(struct sun4i_req_ctx),
 		.cra_module = THIS_MODULE,
 		.cra_alignmask = 3,
@@ -337,6 +345,17 @@ static int sun4i_ss_probe(struct platform_device *pdev)
 
 	spin_lock_init(&ss->slock);
 
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	ss->engine = crypto_engine_alloc_init(ss->dev, 1);
+	if (!ss->engine)
+		goto error_clk;
+	ss->engine->cipher_one_request = sun4i_ss_async_cipher;
+	ss->engine->hash_one_request = sun4i_ss_async_hash;
+	err = crypto_engine_start(ss->engine);
+	if (err)
+		goto error_engine;
+#endif
+
 	for (i = 0; i < ARRAY_SIZE(ss_algs); i++) {
 		ss_algs[i].ss = ss;
 		switch (ss_algs[i].type) {
@@ -384,6 +403,11 @@ error_alg:
 	}
 	if (ss->reset)
 		reset_control_assert(ss->reset);
+
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+error_engine:
+	crypto_engine_exit(ss->engine);
+#endif
 error_clk:
 	clk_disable_unprepare(ss->ssclk);
 error_ssclk:
@@ -411,6 +435,9 @@ static int sun4i_ss_remove(struct platform_device *pdev)
 		}
 	}
 
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	crypto_engine_exit(ss->engine);
+#endif
 	writel(0, ss->base + SS_CTL);
 	if (ss->reset)
 		reset_control_assert(ss->reset);

@@ -31,6 +31,10 @@
 #include <crypto/aes.h>
 #include <crypto/des.h>
 #include <crypto/internal/rng.h>
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+#include <linux/kthread.h>
+#include <crypto/engine.h>
+#endif
 
 #define SS_CTL            0x00
 #define SS_KEY0           0x04
@@ -141,6 +145,9 @@ struct sun4i_ss_ctx {
 	struct random_ready_callback random_ready;
 	struct hwrng hwrng;
 	u32 seed[SS_SEED_LEN / 4];
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	struct crypto_engine *engine;
+#endif
 };
 
 struct sun4i_ss_alg_template {
@@ -172,6 +179,13 @@ struct sun4i_req_ctx {
 	unsigned int len;
 	int flags;
 };
+
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+int sun4i_ss_async_hash(struct crypto_engine *engine, struct ahash_request *areq);
+int sun4i_ss_async_cipher(struct crypto_engine *engine, struct ablkcipher_request *areq);
+#endif
+int sun4i_ss_cipher_poll(struct ablkcipher_request *areq);
+int sun4i_hash(struct ahash_request *areq);
 
 int sun4i_hash_crainit(struct crypto_tfm *tfm);
 int sun4i_hash_init(struct ahash_request *areq);

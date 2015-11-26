@@ -165,7 +165,7 @@ int sun4i_hash_import_sha1(struct ahash_request *areq, const void *in)
  * write remaining data in op->buf
  * final state op->len=56
  */
-static int sun4i_hash(struct ahash_request *areq)
+int sun4i_hash(struct ahash_request *areq)
 {
 	u32 v, ivmode = 0;
 	unsigned int i = 0;
@@ -484,26 +484,47 @@ release_ss:
 int sun4i_hash_final(struct ahash_request *areq)
 {
 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
+	struct sun4i_tfm_ctx *tfmctx = crypto_ahash_ctx(tfm);
+	struct sun4i_ss_ctx *ss = tfmctx->ss;
 
 	op->flags = SS_HASH_FINAL;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_hash_request_to_engine(ss->engine, areq);
+#else
 	return sun4i_hash(areq);
+#endif
 }
 
 int sun4i_hash_update(struct ahash_request *areq)
 {
 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
+	struct sun4i_tfm_ctx *tfmctx = crypto_ahash_ctx(tfm);
+	struct sun4i_ss_ctx *ss = tfmctx->ss;
 
 	op->flags = SS_HASH_UPDATE;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_hash_request_to_engine(ss->engine, areq);
+#else
 	return sun4i_hash(areq);
+#endif
 }
 
 /* sun4i_hash_finup: finalize hashing operation after an update */
 int sun4i_hash_finup(struct ahash_request *areq)
 {
 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
+	struct sun4i_tfm_ctx *tfmctx = crypto_ahash_ctx(tfm);
+	struct sun4i_ss_ctx *ss = tfmctx->ss;
 
 	op->flags = SS_HASH_UPDATE | SS_HASH_FINAL;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_hash_request_to_engine(ss->engine, areq);
+#else
 	return sun4i_hash(areq);
+#endif
 }
 
 /* combo of init/update/final functions */
@@ -511,11 +532,18 @@ int sun4i_hash_digest(struct ahash_request *areq)
 {
 	int err;
 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
+	struct sun4i_tfm_ctx *tfmctx = crypto_ahash_ctx(tfm);
+	struct sun4i_ss_ctx *ss = tfmctx->ss;
 
 	err = sun4i_hash_init(areq);
 	if (err != 0)
 		return err;
 
 	op->flags = SS_HASH_UPDATE | SS_HASH_FINAL;
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
+	return crypto_transfer_hash_request_to_engine(ss->engine, areq);
+#else
 	return sun4i_hash(areq);
+#endif
 }

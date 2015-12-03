@@ -35,6 +35,9 @@
 #include <linux/kthread.h>
 #include <crypto/engine.h>
 #endif
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_DMA
+#include <linux/dmaengine.h>
+#endif
 
 #define SS_CTL            0x00
 #define SS_KEY0           0x04
@@ -52,6 +55,7 @@
 #define SS_IV3            0x30
 
 #define SS_FCSR           0x44
+#define SS_ICSR           0x48
 
 #define SS_MD0            0x4C
 #define SS_MD1            0x50
@@ -133,6 +137,8 @@
 #define SS_SEED_LEN (192 / 8)
 #define SS_DATA_LEN (160 / 8)
 
+#define SS_ICSR_DRQ_ENABLE		(1 << 4)
+
 struct sun4i_ss_ctx {
 	void __iomem *base;
 	int irq;
@@ -147,6 +153,13 @@ struct sun4i_ss_ctx {
 	u32 seed[SS_SEED_LEN / 4];
 #ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
 	struct crypto_engine *engine;
+#endif
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_DMA
+	unsigned long phys_base;
+	struct dma_chan *chan_rx;
+	struct dma_chan *chan_tx;
+	struct completion complete;
+	int dma_success;
 #endif
 };
 
@@ -183,6 +196,11 @@ struct sun4i_req_ctx {
 #ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
 int sun4i_ss_async_hash(struct crypto_engine *engine, struct ahash_request *areq);
 int sun4i_ss_async_cipher(struct crypto_engine *engine, struct ablkcipher_request *areq);
+#endif
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_DMA
+void sun4i_ss_dma_callback(void *data);
+int sun4i_ss_dma_init(struct sun4i_ss_ctx *ss);
+int sun4i_ss_dma(struct ablkcipher_request *areq);
 #endif
 int sun4i_ss_cipher_poll(struct ablkcipher_request *areq);
 int sun4i_hash(struct ahash_request *areq);

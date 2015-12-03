@@ -554,6 +554,14 @@ config CRYPTO_DEV_SUN4I_SS_ASYNC
 	  This option made the Security System asynchronous at the cost
 	  of some performance loss.
 
+config CRYPTO_DEV_SUN4I_SS_DMA
+	bool "Support DMA for Allwinner Security System"
+	depends on CRYPTO_DEV_SUN4I_SS_ASYNC && (DMA_SUN4I || DMA_SUN6I)
+	help
+	  This otion enable the usage of DMA in the Security System.
+	  This will permit to offload the CPU at the cost of some major
+	  performance loss.
+
 config CRYPTO_DEV_ROCKCHIP
 	tristate "Rockchip's Cryptographic Engine driver"
 	depends on OF && ARCH_ROCKCHIP

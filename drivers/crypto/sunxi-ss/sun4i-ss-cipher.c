@@ -66,6 +66,10 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
 	}
 	writel(mode, ss->base + SS_CTL);
 
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_DMA
+	/* TODO fallback to POLL ? */
+	return sun4i_ss_dma(areq);
+#endif
 	sg_miter_start(&mi, areq->src, sg_nents(areq->src),
 		       SG_MITER_FROM_SG | SG_MITER_ATOMIC);
 	sg_miter_start(&mo, areq->dst, sg_nents(areq->dst),

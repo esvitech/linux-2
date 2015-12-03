@@ -355,6 +355,10 @@ static int sun4i_ss_probe(struct platform_device *pdev)
 	if (err)
 		goto error_engine;
 #endif
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_DMA
+	ss->phys_base = res->start;
+	sun4i_ss_dma_init(ss);
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(ss_algs); i++) {
 		ss_algs[i].ss = ss;
@@ -437,6 +441,16 @@ static int sun4i_ss_remove(struct platform_device *pdev)
 
 #ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_ASYNC
 	crypto_engine_exit(ss->engine);
+#endif
+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_DMA
+	if (ss->chan_rx) {
+		dmaengine_terminate_all(ss->chan_rx);
+		dma_release_channel(ss->chan_rx);
+	}
+	if (ss->chan_tx) {
+		dmaengine_terminate_all(ss->chan_tx);
+		dma_release_channel(ss->chan_tx);
+	}
 #endif
 	writel(0, ss->base + SS_CTL);
 	if (ss->reset)

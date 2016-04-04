@@ -191,3 +191,7 @@
 	allwinner,leds-active-low;
 	status = "okay";
 };
+
+&crypto {
+	status = "okay";
+};

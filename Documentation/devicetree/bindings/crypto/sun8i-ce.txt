@@ -1,0 +1,28 @@
+* Allwinner CryptoEngine / Security System found on A80/A83T/H3/A64 SoC
+
+Required properties:
+- compatible : Should be one of
+	"allwinner,sun8i-h3-crypto"
+	"allwinner,sun50i-a64-crypto"
+	"allwinner,sun9i-a80-crypto"
+	"allwinner,sun8i-a83t-crypto"
+- reg: Should contain the CE register location and length.
+- interrupts: Should contain the IRQ line for the CE. (Non secure IRQ if
+  two exists)
+- clocks : List of clock specifiers, corresponding to ahb and ce.
+- clock-names : Name of the functional clock, should be
+	* "ahb" : AHB gating clock
+	* "mod" : CE/SS controller clock
+
+Optional properties:
+ - resets : phandle + reset specifier pair
+ - reset-names : must contain "ahb"
+
+Example:
+	crypto: crypto-engine@01c15000 {
+		compatible = "allwinner,sun4i-a10-crypto";
+		reg = <0x01c15000 0x1000>;
+		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&ahb_gates 5>, <&ss_clk>;
+		clock-names = "ahb", "mod";
+	};

@@ -610,10 +610,11 @@
 			syscon = <&syscon>;
 			reg = <0x01c30000 0x104>;
 			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "macirq";
 			resets = <&ccu RST_BUS_EMAC>;
-			reset-names = "ahb";
+			reset-names = "stmmaceth";
 			clocks = <&ccu CLK_BUS_EMAC>;
-			clock-names = "ahb";
+			clock-names = "stmmaceth";
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";

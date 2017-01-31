@@ -191,6 +191,12 @@ static int stmmac_dt_phy(struct plat_stmmacenet_data *plat,
 		}
 	}
 
+	/* TODO modify previous code */
+	plat->mdio_node = of_get_child_by_name(np, "mdio");
+	if (!plat->mdio_node) {
+		dev_info(dev, "Could not find the optional MDIO node\n");
+	}
+
 	if (plat->mdio_node) {
 		dev_dbg(dev, "Found MDIO subnode\n");
 		mdio = true;

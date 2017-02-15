@@ -109,6 +109,8 @@ struct stmmac_axi {
 	bool axi_rb;
 };
 
+struct stmmac_priv;
+
 struct plat_stmmacenet_data {
 	int bus_id;
 	int phy_addr;
@@ -136,6 +138,7 @@ struct plat_stmmacenet_data {
 	void (*fix_mac_speed)(void *priv, unsigned int speed);
 	int (*init)(struct platform_device *pdev, void *priv);
 	void (*exit)(struct platform_device *pdev, void *priv);
+	struct mac_device_info *(*setup)(struct stmmac_priv *priv);
 	void *bsp_priv;
 	struct clk *stmmac_clk;
 	struct clk *pclk;

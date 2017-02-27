@@ -28,13 +28,15 @@
 #include <linux/slab.h>
 #include <linux/ramfs.h>
 #include <linux/shmem_fs.h>
-
+#include <linux/loop.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
 #include <linux/nfs_mount.h>
 
 #include "do_mounts.h"
-
+#define DEFAUT_ROOTFS_IMAGE "dsys.bin" 
+#define LAST_ROOTFS_IMAGE "lsys.bin" 
+#define CONFIG_BLK_DEV_INITLO 1
 int __initdata rd_doload;	/* 1 = load RAM disk, 0 = don't load */
 
 int root_mountflags = MS_RDONLY | MS_SILENT;
@@ -508,6 +510,64 @@ void __init change_floppy(char *fmt, ...)
 	}
 }
 #endif
+#ifdef CONFIG_BLK_DEV_INITLO
+static int __initdata root_lo_mountflags = MS_RDONLY | MS_VERBOSE;
+
+static int __init lo_readonly(char *str)
+{
+    if (*str)
+        return 0;
+    root_lo_mountflags |= MS_RDONLY;
+    return 1;
+}
+
+static int __init lo_readwrite(char *str)
+{
+    if (*str)
+        return 0;
+    root_lo_mountflags &= ~MS_RDONLY;
+    return 1;
+}
+
+__setup("loro", lo_readonly);
+__setup("lorw", lo_readwrite);
+
+/* setting 'lofile' activates INITIAL LOOPBACK */
+static char * __initdata root_lo_file_data;
+static int __init root_lo_file_setup(char *str)
+{
+    root_lo_file_data = str;
+    return 1;
+}
+static char * __initdata root_lo_mount_data;
+static int __init root_lo_data_setup(char *str)
+{
+    root_lo_mount_data = str;
+    return 1;
+}
+
+static char * __initdata root_lo_fs_names;
+static int __init lo_fs_names_setup(char *str)
+{
+    root_lo_fs_names = str;
+    return 1;
+}
+
+static int __initdata lo_offset;
+static int __init lo_offset_setup(char *str)
+{
+    lo_offset = simple_strtol(str,NULL,0);
+    return 1;
+}
+
+__setup("lofile=", root_lo_file_setup);
+__setup("loflags=", root_lo_data_setup);
+__setup("lofstype=", lo_fs_names_setup);
+__setup("loffset=", lo_offset_setup);
+#endif  /* CONFIG_BLK_DEV_INITLO */
+
+
+
 
 void __init mount_root(void)
 {
@@ -542,6 +602,101 @@ void __init mount_root(void)
 	}
 #endif
 }
+
+/*
+ * if handle_initlo terminates prematurely, this kernel is
+ * very likely to panic because of wrong rootfs.
+ * This is the tough law of the jungle.
+ */
+static int __init initlo_load(void)
+{
+#ifdef CONFIG_BLK_DEV_INITLO
+    dev_t loop0_root_dev = MKDEV(LOOP_MAJOR,0);
+    struct loop_info loopinfo;
+    int error;
+    int fd, loop_fd;
+
+    if (!root_lo_file_data)
+        return 0;
+
+    create_dev("/dev/loop0", loop0_root_dev);
+
+    printk(KERN_NOTICE "Mounting storage filesystem ... \n");
+    mount_root();
+
+    sys_chdir("/root");
+
+    printk(KERN_NOTICE "Binding loopback device ... \n");
+
+    fd = sys_open(root_lo_file_data, root_lo_mountflags&MS_RDONLY ? O_RDONLY:O_RDWR, 0);
+    if (fd < 0) {
+        printk(KERN_CRIT "Opening looback file '%s' failed (%d)!\n", root_lo_file_data, fd);
+		root_lo_file_data= LAST_ROOTFS_IMAGE;
+    	fd = sys_open(root_lo_file_data, root_lo_mountflags&MS_RDONLY ? O_RDONLY:O_RDWR, 0);
+		if(fd < 0){
+        	printk(KERN_CRIT "Opening looback file '%s' failed (%d)!\n", root_lo_file_data, fd);
+			root_lo_file_data= DEFAUT_ROOTFS_IMAGE;
+    		fd = sys_open(root_lo_file_data, root_lo_mountflags&MS_RDONLY ? O_RDONLY:O_RDWR, 0);
+			if(fd < 0){
+        		printk(KERN_CRIT "Opening looback file '%s' failed (%d)!\n", root_lo_file_data, fd);
+        		return 0;
+			}
+		}
+    }
+
+    loop_fd = sys_open("/dev/loop0", O_RDONLY, 0);
+
+    if (loop_fd < 0) {
+        printk(KERN_CRIT "Opening loop0 failed (%d)!\n", loop_fd);
+        sys_close(fd);
+        return 0;
+    }
+    memset(&loopinfo, 0, sizeof(loopinfo));
+    strncpy(loopinfo.lo_name, root_lo_file_data, LO_NAME_SIZE);
+
+        loopinfo.lo_offset = lo_offset;
+
+        loopinfo.lo_encrypt_key_size = 0;
+        if ((error = sys_ioctl(loop_fd, LOOP_SET_FD, fd)) < 0) {
+        printk(KERN_CRIT "ioctl: LOOP_SET_FD failed (%d)!\n", error);
+                sys_close(loop_fd);
+                sys_close(fd);
+                return 0;
+        }
+        if ((error = sys_ioctl(loop_fd, LOOP_SET_STATUS, (unsigned long)&loopinfo)) < 0) {
+                sys_ioctl(loop_fd, LOOP_CLR_FD, 0);
+        printk(KERN_CRIT "ioctl: LOOP_SET_STATUS failed (%d)!\n", error);
+                sys_close(loop_fd);
+                sys_close(fd);
+                return 0;
+        }
+        sys_close(loop_fd);
+        sys_close(fd);
+
+    printk(KERN_NOTICE "Mounting loopback device ... \n");
+
+    sys_mkdir("/old", 0700);
+    error = sys_mount("/root", "/old", NULL, MS_MOVE, NULL);
+
+    root_fs_names = root_lo_fs_names;
+    root_mount_data = root_lo_mount_data;
+    ROOT_DEV = loop0_root_dev;
+    mount_block_root("/dev/loop0", root_lo_mountflags /* & ~MS_RDONLY */);
+
+    /* note: /initlo directory may be missing, in which case, unmount it */
+    printk(KERN_NOTICE "Trying to move old root to /initlo ... ");
+    error = sys_mount("/old", "/root/initlo", NULL, MS_MOVE, NULL);
+    printk(!error ? "okay\n" : "failed\n");
+
+    return 1;
+#else
+    return 0;
+#endif  /* CONFIG_BLK_DEV_INITLO */
+}
+
+
+
+
 
 /*
  * Prepare the namespace - decide what/where to mount, load ramdisks, etc.
@@ -596,6 +751,8 @@ void __init prepare_namespace(void)
 
 	if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;
+    if (initlo_load())
+        goto out;
 
 	mount_root();
 out:
